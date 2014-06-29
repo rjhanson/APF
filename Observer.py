@@ -1,5 +1,5 @@
 #!/usr/bin/env  /opt/kroot/bin/kpython
-# Draft for the watcher script that will keep an eye on APF
+# Observation script to automate the nightly operation of the APF
  
 
 import time
@@ -15,7 +15,7 @@ import argparse
 import ktl
 import APF
 import APFTask
-import APF_Draft as ad
+import APFMonitor as ad
 
 from apflog import *
 import schedulerHelper as sh
@@ -24,6 +24,7 @@ import schedulerHelper as sh
 
 success = False
 
+# Our APFTask name, this is registered with APFTask so the script can be aborted or paused as required
 parent = 'master'
 
 
@@ -58,7 +59,7 @@ def args():
     opt = parser.parse_args()
     return opt
 
-
+# Currently required for legacy operation
 def findObsNum():
     # Where the butler logsheet lives
     butlerPath = r"/u/user/starlists/ucsc/"
@@ -181,10 +182,11 @@ class Master(threading.Thread):
                         self.tooDone = True
                         continue
                 if self.fixedList is not None and self.fixedDone == False:
-                    print "Found Fixed list"
-                    print self.fixedList
+                    apflog("Found Fixed list", echo=True)
+                    apflog(self.fixedList, echo=True)
                     APF.observe(str(self.fixedList))
                     self.fixedDone = True
+                    # Swap out time.sleep calls for APFTask.waitfor(False, time)
                     time.sleep(5)
                     continue
                 else:
@@ -223,11 +225,12 @@ if __name__ == '__main__':
 
     if opt.test:
         debug = True
+        parent = "example"
     else:
         debug = False
+        parent = "master"
 
-    print "Starting Nights Run..."
-    parent = 'master'
+    apflog("Starting Nights Run...",echo=True)
 
     # Establish this as the only running master script
     try:
@@ -290,7 +293,9 @@ if __name__ == '__main__':
 
         apflog("Figuring out what the observation number should be.",echo=False)
         
-
+        # We first find what we expect the observation number to be
+        # We present this to the user, so they have the option to override the program
+        # If after 15 seconds there is no user input, we assume our guess is correct and move on
         print "Welcome! I think the starting observation number should be:"
         print repr(obsNum)
         print ''
@@ -386,7 +391,7 @@ if __name__ == '__main__':
     # We have finished taking data, and presumably it is the morning.
     apf.setTeqMode('Morning')
 
-    # Remove/rename required files for scheduler V1.
+    # Remove/rename required files for scheduler V1. ( Legacy scheduler )
     # This is required for the next nights run to be successfull.
     try:
         sh.cleanup()
@@ -406,6 +411,7 @@ if __name__ == '__main__':
     # All Done!
     APFTask.phase(parent, "Finished")
 
+    # Set atexit variable to True, and call exit (calling our atexit function)
     success = True
     sys.exit()
 
